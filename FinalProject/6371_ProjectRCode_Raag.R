@@ -101,7 +101,7 @@ AQ1Model = lm((log(SalePrice)~GrLivArea+Neighborhood+Neighborhood*GrLivArea),dat
 summary(AQ1Model)
 
 par(mfrow = c(2,2))
-
+   
 plot(AQ1Model)
 
 par(mfrow = c(1,1))
