@@ -170,8 +170,6 @@ summary(AQ1Model)
 
 ####################################### Data Selection // Analysis Question 2
 
-
-
 # Building a correlation matrix, where we only take data that has high ( > |.5|) correlation
 # with SalePrice
 
@@ -181,11 +179,10 @@ CorrMatData = Clean_FullData %>% dplyr::select(where(is.numeric)) %>% correlate(
 CorrMatData  %>% 
   ggplot(aes(x = term, y = SalePrice)) +
   geom_bar(stat = "identity", color = "black", fill = "turquoise") +
-  ylab("Correlation with Sale Price") +
-  xlab("Variable") +  geom_text(aes(label = paste(round((SalePrice*100),2), "%", sep = "")), 
-                                parse = F, vjust=1.6, color="black", size=3.5) + 
-  theme_tufte()
-
+  ylab("Correlation with Sale Price") + xlab("Variable") + theme_tufte() +
+  geom_text(aes(label = paste(round((SalePrice*100),2), "%", sep = "")), 
+                                parse = F, vjust=1.6, color="black", size=3.5) 
+  
 
 # Looking to see if the saleprice has significant changes over the years
 
@@ -195,15 +192,49 @@ ggplot(Clean_FullData, aes(x=YrSold, y=SalePrice, fill = YrSold)) + geom_boxplot
   labs(title = "Price of Home Sales Over the Years", x = "Year Sold", y = "SalePrice")
   
 
+# Let's test the correlation between the categorical variables and the sales price
+# to see which variables we should keep there. 
+
+# First we will create a dataframe with just the catgeorical variables and 
+# SalePrice
+
+CatModelData =  Clean_FullData %>% dplyr::select(!where(is.numeric), SalePrice, -Utilities)
+# We need sale price obviously, and all homes have the same value for utilities.
+sapply(CatModelData, class)
+
+Model_Cat_SP = aov(SalePrice ~ YrSold, data = CatModelData)
+summary(Model_Cat_SP)
+
+# Where is the p value stored in the AOV model? 
+summary(aov(SalePrice ~ YrSold, data = CatModelData))[[1]][["Pr(>F)"]][1]
+
+# Attempting to build a function where I loop all of the cat variables
+# that we have, and eliminate those that have little to no effect on the data.
+# We can use the AOV since we have met the assumptions, and it will tell us if 
+# atleast one of the factor levels in each column have some effect on the mean.
+
+yCol = NULL
+x = 0
+
+for (i in 1:length(CatModelData)-1){
+  x = x + 1
+  # print(x)
+  if (summary(aov(SalePrice ~ CatModelData[,x], data = CatModelData))[[1]][["Pr(>F)"]][1] > .05){ # alpha level
+    yCol = append(yCol,x)
+    # print(summary(aov(SalePrice ~ CatModelData[,x], data = CatModelData))[[1]][["Pr(>F)"]][1])
+  }
+}
+
+yCol
+length(yCol)
 
 
+CatModelData = subset(CatModelData, select = -yCol)
+
+sapply(CatModelData, class)
 
 
-
-
-
-
-
+summary.aov(SalePrice ~ LotShape, data = CatModelData)
 
 
 
