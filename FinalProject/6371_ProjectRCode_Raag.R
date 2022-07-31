@@ -8,14 +8,18 @@ library(knitr)
 library(ggplot2)
 library(ggpubr)
 library(ggcorrplot)
+library(ggthemes)
 
 library(stringr)
+library(corrplot)
+library(corrr)
 library(multcomp)
 library(pairwiseCI)
 library(effectsize)
 library(investr)
 library(broom)
 library(olsrr)
+
 
 setwd("D:/School/GitHub/MSDS_6371_Stat_Foundations/FinalProject")
 
@@ -91,13 +95,13 @@ summary(AQ1_Data)
 
 ## Plotting the data
 
-ggplot(AQ1_Data, aes(x = GrLivArea, y = log(SalePrice))) + geom_point(aes(color = Neighborhood), alpha = .8) + 
+ggplot(AQ1_Data, aes(x = GrLivArea, y = SalePrice)) + geom_point(aes(color = Neighborhood), alpha = .8) + 
   geom_smooth(method='lm', se = F, color = 'black')
 
 
 ## Model
 
-AQ1Model = lm((log(SalePrice)~GrLivArea+Neighborhood+Neighborhood*GrLivArea),data = AQ1_Data)
+AQ1Model = lm((SalePrice~GrLivArea+Neighborhood+Neighborhood*GrLivArea),data = AQ1_Data)
 summary(AQ1Model)
 
 par(mfrow = c(2,2))
@@ -117,7 +121,7 @@ OutRem_AQ1_Data = AQ1_Data
 
 OutRem_AQ1_Data = OutRem_AQ1_Data[-c(70,95,119,136,248,262),]
 
-AQ1Model = lm((log(SalePrice)~GrLivArea+Neighborhood+Neighborhood*GrLivArea),data = OutRem_AQ1_Data)
+AQ1Model = lm((SalePrice~GrLivArea+Neighborhood+Neighborhood*GrLivArea),data = OutRem_AQ1_Data)
 
 summary(AQ1Model)
 
@@ -151,20 +155,34 @@ par(mfrow = c(1,1))
 
 ####################################### Data Selection // Analysis Question 2
 
-CorrMatData = Clean_FullData %>% dplyr::select(where(is.numeric))
+# Need to assign certain columns to be categorical/continuos. 
+
+write.csv(Clean_FullData,"Data/Clean_FullData.csv", row.names = T)
+
+
+CorrMatData = Clean_FullData %>% dplyr::select(where(is.numeric)) %>% correlate() %>% focus(SalePrice) %>% 
+  mutate(term = factor(term, levels = term[order(SalePrice)])) %>% filter(SalePrice > abs(.5))
 
 CleanCorrMatrix = round(cor(CorrMatData), 1)
 
-ggcorrplot(CleanCorrMatrix, hc.order = TRUE, type = "lower", outline.col = "white")
+corrplot(CleanCorrMatrix,type = "upper",order = "hclust",addCoef.col = "black",
+         number.digits = 2,method = "shade",tl.srt=40, tl.cex = 0.9,tl.col = "black", 
+         number.cex = 0.9 , title = "Numeric Correlation")
 
 
-ggplot(Clean_FullData, aes(x=YrSold, y=log(SalePrice), fill = YrSold)) + geom_boxplot() + 
+ggplot(Clean_FullData, aes(x=YrSold, y=SalePrice, fill = YrSold)) + geom_boxplot() + 
   theme(legend.position="none") + 
   scale_fill_brewer(palette="Dark2") + 
   labs(title = "Log(SalePrice) Over the Years)", x = "Year Sold", y = "Log(SalePrice)")
   
 
-
+CorrMatData  %>% 
+  ggplot(aes(x = term, y = SalePrice)) +
+  geom_bar(stat = "identity", color = "black", fill = "turquoise") +
+  ylab("Correlation with Sale Price") +
+  xlab("Variable") +  geom_text(aes(label = paste(round((SalePrice*100),2), "%", sep = "")), 
+                                parse = F, vjust=1.6, color="black", size=3.5) + 
+  theme_tufte()
 
 
 
