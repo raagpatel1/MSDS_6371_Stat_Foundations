@@ -79,79 +79,96 @@ dim(Clean_FullData)
 # complete information on a house. This sample is more than plenty to configure
 # a model. 
 
-Clean_FullData$Neighborhood = as.factor(Clean_FullData$Neighborhood)
-Clean_FullData$YrSold = as.factor(Clean_FullData$YrSold)
-
 # Remove ID Column, as we do not need it, since we can access row number. 
 # If we do need it, we can use FullData to fill in the blanks. 
 
 Clean_FullData$Id = NULL
 
-
-####################################### Data Selection // Analysis Question 1
-
-# Setting the pattern allows us to easily select 3 neighborhood
-
-pattern = c("NAmes","Edwards","BrkSide")
-
-AQ1_Data = Clean_FullData %>% dplyr::select(Neighborhood,GrLivArea,SalePrice) %>% 
-  filter(grepl(paste(pattern, collapse="|"), Neighborhood)) %>%
-  mutate(GrLivArea = round(GrLivArea / 100))
-
-summary(AQ1_Data)
-
-## Plotting the data
-
-ggplot(AQ1_Data, aes(x = GrLivArea, y = SalePrice)) + geom_point(aes(color = Neighborhood), alpha = .8) + 
-  geom_smooth(method='lm', se = F, color = 'black')
-
-
-## Model
-
-AQ1Model = lm((SalePrice~GrLivArea+Neighborhood+Neighborhood*GrLivArea),data = AQ1_Data)
-summary(AQ1Model)
-
-par(mfrow = c(2,2))
-   
-plot(AQ1Model)
-
-par(mfrow = c(1,1))
-
-# Looking at the plots, it's clear to see that there are points that are neccesary
-# to remove. Looking at Resids V Lev, we can see that are points that should be 
-# looked at. 
-
-# The ADJ r^2 value seems pretty low, at .4206, let see if removing the points mentioned
-# will increase it. 
-
-OutRem_AQ1_Data = AQ1_Data
-
-OutRem_AQ1_Data = OutRem_AQ1_Data[-c(70,95,119,136,248,262),]
-
-AQ1Model = lm((SalePrice~GrLivArea+Neighborhood+Neighborhood*GrLivArea),data = OutRem_AQ1_Data)
-
-summary(AQ1Model)
-
-par(mfrow = c(2,2))
-
-plot(AQ1Model)
-
-par(mfrow = c(1,1))
-
-# Okay, these graphs look a lot better, and the ADJ R^2, went up to .49. The model still isn't
-# great, but that's also because of the exclusion of so many other variables. 
-
-
-
-
-####################################### Data Selection // Analysis Question 2
-
 # Need to assign certain columns to be categorical/continuous. So we will output
-# the dataframe to a csv, and go through the columns. 
+# the dataframe to a csv, and go through the columns, using the kaggle website
+# to help us.
 
 write.csv(Clean_FullData,"Data/Clean_FullData.csv", row.names = T)
 
-# Have to do it manually.
+# Have to do it manually:
+
+sapply(Clean_FullData, class)
+
+Clean_FullData[,c(1,2,5:24,26:32,34,38:41,52,54,56:58,61:63,72:74)] <- lapply(Clean_FullData[,c(1,2,5:24,26:32,34,38:41,52,54,56:58,61:63,72:74)], factor)
+
+sapply(Clean_FullData, class)
+
+
+####################################### Data Selection // Analysis Question 1
+
+# # Setting the pattern allows us to easily select 3 neighborhood
+# 
+pattern = c("NAmes","Edwards","BrkSide")
+# 
+AQ1_Data = Clean_FullData %>% dplyr::select(Neighborhood,GrLivArea,SalePrice) %>%
+  filter(grepl(paste(pattern, collapse="|"), Neighborhood)) %>%
+  mutate(GrLivArea = round(GrLivArea / 100))
+# 
+# summary(AQ1_Data)
+# 
+# ## Plotting the data
+# 
+ggplot(AQ1_Data, aes(x = GrLivArea, y = SalePrice)) + geom_point(aes(color = Neighborhood), alpha = .8) +
+  geom_smooth(method='lm', se = F, color = 'black')
+# 
+# 
+# ## Model
+# 
+AQ1Model = lm((SalePrice~GrLivArea+Neighborhood+Neighborhood*GrLivArea),data = AQ1_Data)
+summary(AQ1Model)
+# 
+par(mfrow = c(2,2))
+
+plot(AQ1Model)
+
+par(mfrow = c(1,1))
+# 
+# # Looking at the plots, it's clear to see that there are points that are neccesary
+# # to remove. Looking at Resids V Lev, we can see that are points that should be 
+# # looked at. 
+# 
+# # The ADJ r^2 value seems pretty low, at .4206, let see if removing the points mentioned
+# # will increase it. 
+# 
+
+# Statistically removed outliers
+cooksD <- cooks.distance(AQ1Model)
+# cooksD
+
+influential <- cooksD[(cooksD >(3 * mean(cooksD,na.rm = TRUE)))]
+# influential
+
+names_of_influential <- names(influential)
+outliers <- AQ1_Data[names_of_influential,]
+OutRem_AQ1_Data <- AQ1_Data %>% anti_join(outliers)
+
+
+AQ1Model <-lm(SalePrice~GrLivArea+Neighborhood+Neighborhood*GrLivArea,data =OutRem_AQ1_Data)
+
+summary(AQ1Model)
+
+# confint(AQ1Model)
+# 
+# par(mfrow = c(2,2))
+# 
+# plot(AQ1Model)
+# 
+# par(mfrow = c(1,1))
+# 
+# # Okay, these graphs look a lot better, and the ADJ R^2, went up to .49. The model still isn't
+# # great, but that's also because of the exclusion of so many other variables. 
+# 
+# # Let's remove the outliers from our main dataset now.
+# 
+# Clean_FullData = Clean_FullData[-c(339,131,190,169,372),]
+
+
+####################################### Data Selection // Analysis Question 2
 
 
 
@@ -175,7 +192,7 @@ CorrMatData  %>%
 ggplot(Clean_FullData, aes(x=YrSold, y=SalePrice, fill = YrSold)) + geom_boxplot() + 
   theme(legend.position="none") + 
   scale_fill_brewer(palette="Dark2") + 
-  labs(title = "Log(SalePrice) Over the Years)", x = "Year Sold", y = "Log(SalePrice)")
+  labs(title = "Price of Home Sales Over the Years", x = "Year Sold", y = "SalePrice")
   
 
 

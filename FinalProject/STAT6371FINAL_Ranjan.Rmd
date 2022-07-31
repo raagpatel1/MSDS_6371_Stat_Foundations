@@ -5,6 +5,31 @@ date: "7/23/2022"
 output: html_document
 ---
 
+library(tidyverse)
+library(dplyr)
+library(car)
+library(readr)
+library(readxl)
+library(knitr)
+
+library(ggplot2)
+library(ggpubr)
+install.packages("ggcorrplot")
+library(ggcorrplot)
+
+library(stringr)
+library(multcomp)
+library(pairwiseCI)
+library(effectsize)
+library(investr)
+library(broom)
+library(olsrr)
+library(corrplot)
+
+
+
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -68,7 +93,9 @@ library(dplyr)
 
 Cent21 = hpdf %>% filter(Neighborhood == "NAmes"|Neighborhood=="Edwards"|Neighborhood=="BrkSide" ) 
 Cent21
+head(Cent21)
 count(Cent21) ## 383
+colSums(is.na(Cent21))
 
 ```
 
@@ -79,7 +106,7 @@ count(Cent21) ## 383
 ```{r}
 sfit <- lm(SalePrice~GrLivAreaper100+Neighborhood+Neighborhood*GrLivAreaper100,data = Cent21)
 summary(sfit)
-Confint(sfit)
+confint(sfit)
 
 ```
 
@@ -174,7 +201,7 @@ outlierTest(sfit)
 
 
 ```
-## observations 190,339,169 ,372 are potential outliers
+## these observations  are potential outliers . more than 3 times the mean. 
 
 ```{r}
 Cent21[c("190"),] ## 1698 sq ft for 320 K -Neighborhood Edwards
@@ -182,7 +209,10 @@ Cent21[c("339"),] ## 5642 sq ft for 160 K -Neighborhood Edwards
 Cent21[c("169"),] ##2704 sq ft for 345 K -Neighborhood NAmes
 Cent21[c("372"),] ##  2201  sq ft for 274 K -Neighborhood Edwards
 Cent21[c("131"),] ## 4676  sq ft for 184 K -Neighborhood Edwards
-Cent21[c("48"),]
+Cent21[c("48"),] #2158 243K
+Cent21[c("180"),] #2360 for 129k
+Cent21[c("205"),] #1576 223500
+
 ```
 
 ```{r}
@@ -302,9 +332,16 @@ plot(sfit)
 
 MeanSalePrice <-Cent21 %>% group_by(Neighborhood) %>% summarise(SalePrice_mean = mean(SalePrice))
 MeanSalePrice
+#after outliers removed
+MeanSalePrice <-Cent21WO %>% group_by(Neighborhood) %>% summarise(SalePrice_mean = mean(SalePrice))
+MeanSalePrice
 
+# after outliers removed
 MeanLivingArea <-Cent21 %>% group_by(Neighborhood) %>% summarise(Livigarea_mean = mean(GrLivArea))
 MeanLivingArea
+
+MeanSalePrice <-Cent21WO %>% group_by(Neighborhood) %>% summarise(SalePrice_mean = mean(SalePrice))
+MeanSalePrice
 ```
 
 
@@ -441,3 +478,139 @@ ols_plot_resid_hist(sfitWO)
 ##############################QQQ2###########################################################
 
 
+#checking for NA in data frame train and test data frame and replacing with 0. 
+```{r}
+train <- read.csv("train.csv",header = TRUE, ",")
+
+nrow(train)
+ncol(train)
+colSums(is.na(train))
+
+trainClean <- mutate_all(train,~replace_na(.,0))
+colSums(is.na(trainClean)) 
+nrow(trainClean)  #1460 rows 
+ncol(trainClean) # 81 columns
+
+library(readr)
+write.csv(trainClean,"trainClean.csv ",row.names=FALSE)
+
+test <- read.csv("test.csv",header = TRUE, ",")
+summary(test)
+nrow(test) #1459
+ncol(test)  #80
+colSums(is.na(test))
+
+testClean <- mutate_all(test,~replace_na(.,0))
+colSums(is.na(testClean)) 
+nrow(testClean)  #1459 rows 
+ncol(testClean) # 80 columns
+write.csv(testClean,"testClean.csv ",row.names=FALSE) ##doesnot export as row number , 
+
+```
+
+```{r}
+test <- read.csv("test.csv",header = TRUE, ",")
+test$
+
+```
+
+### Data cleaning for QQI 2
+```{r}
+FullData <- read.csv("train.csv",header = TRUE, ",",na.strings = "NA",strip.white = T)
+Clean_FullData = FullData
+summary(Clean_FullData)
+
+
+# This is a loop that will go through the columns and decide 
+# whether to delete the column based off of the amount of na's. Then it will 
+# go through each row and eleminate the row if it has more than 1 na. 
+
+yCol = 0
+yRow = 0
+
+for (i in 1:length(Clean_FullData)){
+  x = sum(is.na(Clean_FullData[,i])) / length(Clean_FullData[,i])
+  if (x > 0.3150685){ # 1460 - (.3150685 * 1460) = 1000
+    yCol = append(yCol,i)
+  }
+}
+yCol
+length(yCol)
+Clean_FullData = subset(Clean_FullData, select = -yCol)
+
+
+for (i in 1:nrow(Clean_FullData)){
+  x = as.numeric(rowSums(is.na(Clean_FullData[i,])))
+  if (x > 0){
+    yRow = append(yRow,i)
+  }
+}
+yRow
+length(yRow)
+Clean_FullData = Clean_FullData[-yRow,]
+
+
+# Now that the dataset is cleaned
+
+rm(i,x,yCol,yRow)
+
+summary(Clean_FullData)
+dim(Clean_FullData)
+
+# We can see that there are 76 variables, and 1094 rows, where each row has
+# complete information on a house. This sample is more than plenty to configure
+# a model. 
+
+```
+###QQ2
+
+```{r}
+
+CorrMatData = Clean_FullData %>% dplyr::select(where(is.numeric))
+
+CleanCorrMatrix = round(cor(CorrMatData), 1)
+
+
+corrplot(CleanCorrMatrix,type = "upper",order = "hclust",addCoef.col = "black",number.digits = 2,method = "shade",tl.srt=40, tl.cex = 0.9,tl.col = "black", number.cex = 0.9 , title = "Numeric Correlation")
+
+ggcorrplot(CleanCorrMatrix, hc.order = TRUE, type = "lower", outline.col = "white")
+
+
+ggplot(Clean_FullData, aes(x=YrSold, y=SalePrice, fill = YrSold)) + geom_boxplot() + 
+  theme(legend.position="none") + 
+  scale_fill_brewer(palette="Dark2") + 
+  labs(title = "SalePrice Over the Years)", x = "Year Sold", y = "SalePrice")
+```
+
+## selecting variable that is highly correlated. 0.3 and up with SalePrice
+
+```{r}
+Clean_FullData2 <-dplyr::select(Clean_FullData,"YearRemodAdd","YearBuilt","GarageYrBlt","MasVnrArea","TotalBsmtSF","X1stFlrSF","GarageCars","GarageArea","OpenPorchSF","BsmtFinSF1","Fireplaces","LotFrontage","LotArea","HalfBath","X2ndFlrSF","GrLivArea","TotRmsAbvGrd","SalePrice")
+head(Clean_FullData2)
+
+```
+  
+##fitting a model
+
+```{r}
+fit = lm (SalePrice~.,data = Clean_FullData2 )
+summary(fit)
+
+```
+
+##Backward
+```{r}
+ols_step_backward_p(fit, prem = 0.05, details = TRUE)
+
+```
+
+###Forward
+```{r}
+ols_step_forward_p(fit, penter = 0.05, details = TRUE)
+
+```
+
+stepwise
+```{r}
+ols_step_both_p(fit, prem = 0.05, pent = 0.05, details = TRUE)
+```
