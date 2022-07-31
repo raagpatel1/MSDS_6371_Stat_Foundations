@@ -82,8 +82,15 @@ dim(Clean_FullData)
 Clean_FullData$Neighborhood = as.factor(Clean_FullData$Neighborhood)
 Clean_FullData$YrSold = as.factor(Clean_FullData$YrSold)
 
+# Remove ID Column, as we do not need it, since we can access row number. 
+# If we do need it, we can use FullData to fill in the blanks. 
+
+Clean_FullData$Id = NULL
+
 
 ####################################### Data Selection // Analysis Question 1
+
+# Setting the pattern allows us to easily select 3 neighborhood
 
 pattern = c("NAmes","Edwards","BrkSide")
 
@@ -135,46 +142,24 @@ par(mfrow = c(1,1))
 # great, but that's also because of the exclusion of so many other variables. 
 
 
-# delete later
-#
-# quick note on log(y) transform
-# https://www.real-statistics.com/multiple-regression/multiple-regression-log-transformations/
-#
-# build model here
-
-# Also need to do assumptions formally
-
-par(mfrow = c(2,2))
-
-plot(AQ1Model)
-
-par(mfrow = c(1,1))
-
-
 
 
 ####################################### Data Selection // Analysis Question 2
 
-# Need to assign certain columns to be categorical/continuos. 
+# Need to assign certain columns to be categorical/continuous. So we will output
+# the dataframe to a csv, and go through the columns. 
 
 write.csv(Clean_FullData,"Data/Clean_FullData.csv", row.names = T)
 
+# Have to do it manually.
+
+
+
+# Building a correlation matrix, where we only take data that has high ( > |.5|) correlation
+# with SalePrice
 
 CorrMatData = Clean_FullData %>% dplyr::select(where(is.numeric)) %>% correlate() %>% focus(SalePrice) %>% 
   mutate(term = factor(term, levels = term[order(SalePrice)])) %>% filter(SalePrice > abs(.5))
-
-CleanCorrMatrix = round(cor(CorrMatData), 1)
-
-corrplot(CleanCorrMatrix,type = "upper",order = "hclust",addCoef.col = "black",
-         number.digits = 2,method = "shade",tl.srt=40, tl.cex = 0.9,tl.col = "black", 
-         number.cex = 0.9 , title = "Numeric Correlation")
-
-
-ggplot(Clean_FullData, aes(x=YrSold, y=SalePrice, fill = YrSold)) + geom_boxplot() + 
-  theme(legend.position="none") + 
-  scale_fill_brewer(palette="Dark2") + 
-  labs(title = "Log(SalePrice) Over the Years)", x = "Year Sold", y = "Log(SalePrice)")
-  
 
 CorrMatData  %>% 
   ggplot(aes(x = term, y = SalePrice)) +
@@ -183,6 +168,17 @@ CorrMatData  %>%
   xlab("Variable") +  geom_text(aes(label = paste(round((SalePrice*100),2), "%", sep = "")), 
                                 parse = F, vjust=1.6, color="black", size=3.5) + 
   theme_tufte()
+
+
+# Looking to see if the saleprice has significant changes over the years
+
+ggplot(Clean_FullData, aes(x=YrSold, y=SalePrice, fill = YrSold)) + geom_boxplot() + 
+  theme(legend.position="none") + 
+  scale_fill_brewer(palette="Dark2") + 
+  labs(title = "Log(SalePrice) Over the Years)", x = "Year Sold", y = "Log(SalePrice)")
+  
+
+
 
 
 
