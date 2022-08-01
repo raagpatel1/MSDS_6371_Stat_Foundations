@@ -309,17 +309,17 @@ xtestx = ols_step_both_p(AQ2_Model,pent = .02,prem = .03, progress = T, details 
 # apply the model
 
 
-row.number = sample(1:nrow(AQ2_CleanData), 0.8*nrow(AQ2_CleanData))
-train = AQ2_CleanData[row.number,]
-test = AQ2_CleanData[-row.number,]
-dim(train)
-dim(test)
-
-pred1 <- predict(xtestx$model, newdata = test)
-rmse <- sqrt(sum((exp(pred1) - test$SalePrice)^2)/length(test$SalePrice))
-c(RMSE = rmse, R2=summary(xtestx$model)$r.squared)
-
-IdSalePrice = Clean_FullData %>% dplyr::select(Id,SalePrice)
+# row.number = sample(1:nrow(AQ2_CleanData), 0.8*nrow(AQ2_CleanData))
+# train = AQ2_CleanData[row.number,]
+# test = AQ2_CleanData[-row.number,]
+# dim(train)
+# dim(test)
+# 
+# pred1 <- predict(xtestx$model, newdata = test)
+# rmse <- sqrt(sum((exp(pred1) - test$SalePrice)^2)/length(test$SalePrice))
+# c(RMSE = rmse, R2=summary(xtestx$model)$r.squared)
+# 
+# IdSalePrice = Clean_FullData %>% dplyr::select(Id,SalePrice)
 
 # new attempt
 
@@ -345,9 +345,11 @@ summary(fullStep)
 
 a = predict(fullStep, newdata = test)
 
+x = colnames(AQ2_CleanData)
+x = x[1:42]
+Submission_TestData_Filtered = Submission_TestData %>% dplyr::select(x)
 
-
-TestSubmission_1 = predict(fullStep, newdata = Submission_TestData)
+TestSubmission_1 = predict(fullStep, newdata = Submission_TestData_Filtered)
 
 
 
