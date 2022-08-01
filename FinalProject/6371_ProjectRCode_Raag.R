@@ -349,6 +349,12 @@ x = colnames(AQ2_CleanData)
 x = x[1:42]
 Submission_TestData_Filtered = Submission_TestData %>% dplyr::select(x)
 
+Submission_TestData_Filtered[,c(8:42)] = lapply(Submission_TestData_Filtered[,c(8:42)], factor)
+
+
+sapply(AQ2_CleanData, class)
+sapply(Submission_TestData_Filtered, class)
+
 TestSubmission_1 = predict(fullStep, newdata = Submission_TestData_Filtered)
 
 
