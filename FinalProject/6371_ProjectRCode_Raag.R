@@ -493,18 +493,21 @@ summary(AllData)
 # also trying not to delete any data, as that has screwed us in our first 
 # attempt of this problem. 
 
+
 # Time to split the data up. 
 
 FinalTestData = AllData[1461:2919,1:80]
 
 FinalTrainData = AllData[1:1460,1:81]
 
+sum(is.na(AllData$SalePrice))
+
 # Let's create a model with everything in it, then use olss stepwise to 
 # fix it. 
 
-CustomModel = lm(SalePrice ~  ., data = FinalTrainData)
-summary(CustomModel)
-CV(CustomModel)
+FirstModel = lm(SalePrice ~  ., data = FinalTrainData)
+summary(FirstModel)
+CV(FirstModel)
 # CV           AIC          AICc           BIC         AdjR2 
 # Inf -5779.2668772 -5769.8619426 -5356.4263534     0.8870119 
 
@@ -516,7 +519,7 @@ CV(CustomModel)
 # High AdjR^2, probably bc of the overfitting. Though we are surprised that 
 # the AdjR^2 is not lower with these many variables in the model. 
 
-StepwiseModel = ols_step_both_p(CustomModel, prem = 0.01, pent = 0.02, details = F, progress = T)
+StepwiseModel = ols_step_both_p(FirstModel, prem = 0.01, pent = 0.02, details = F, progress = T)
 StepwiseModel = StepwiseModel$model
 summary(StepwiseModel)
 # Residual standard error: 0.1374 on 1435 degrees of freedom
@@ -528,58 +531,119 @@ CV(StepwiseModel)
 
 
 
-BackwardsModel = ols_step_backward_p(fit, prem = 0.01, details = F, progress = T)
-summary(BackwardsModel)
+BackwardsModel = ols_step_backward_p(FirstModel, prem = 0.01, details = F, progress = T)
 BackwardsModel = BackwardsModel$model
 summary(BackwardsModel)
-# Residual standard error: 7.702 on 198 degrees of freedom
-# Multiple R-squared:  0.3978,	Adjusted R-squared:  0.3948 
-# F-statistic: 130.8 on 1 and 198 DF,  p-value: < 2.2e-16
+# Residual standard error: 0.1363 on 1429 degrees of freedom
+# Multiple R-squared:  0.886,	Adjusted R-squared:  0.8836 
+# F-statistic: 370.1 on 30 and 1429 DF,  p-value: < 2.2e-16
 CV(BackwardsModel)
-#       CV        AIC       AICc        BIC      AdjR2 
-# 59.920338 820.606174 820.728623 830.501126   0.394783 
+#     CV           AIC          AICc           BIC         AdjR2 
+# 2.492174e-02 -5.786626e+03 -5.785146e+03 -5.617468e+03 .8835732
 
 
 
-ForwardModel = ols_step_forward_p(fit, penter = 0.01, details = F, progress = T)
+ForwardModel = ols_step_forward_p(FirstModel, penter = 0.01, details = F, progress = T)
 ForwardModel = ForwardModel$model
 summary(ForwardModel)
-# Residual standard error: 7.702 on 198 degrees of freedom
-# Multiple R-squared:  0.3978,	Adjusted R-squared:  0.3948 
-# F-statistic: 130.8 on 1 and 198 DF,  p-value: < 2.2e-16
+# Residual standard error: 0.1374 on 1435 degrees of freedom
+# Multiple R-squared:  0.8837,	Adjusted R-squared:  0.8817 
+# F-statistic: 454.2 on 24 and 1435 DF,  p-value: < 2.2e-16
 CV(ForwardModel)
-#     CV        AIC       AICc        BIC      AdjR2 
-# 59.920338 820.606174 820.728623 830.501126   0.394783 
+#    CV           AIC          AICc           BIC         AdjR2 
+# 2.433418e-02 -5.769467e+03 -5.768487e+03 -5.632026e+03  .8817212
+
+
+
+CustomModel = lm(SalePrice ~ MSZoning+LotArea+Street+
+                   LotShape+
+                   BldgType+OverallQual+YearBuilt+YearRemodAdd+
+                   RoofMatl+BsmtCond+BsmtFinType1+BsmtFinSF1+
+                   BsmtFinSF2+HeatingQC+CentralAir+X1stFlrSF+X2ndFlrSF+
+                   BsmtFullBath+KitchenQual+TotRmsAbvGrd+Functional+Fireplaces+
+                   GarageCars+ScreenPorch+PoolQC+SaleCondition, data = FinalTrainData)
+summary(CustomModel)
+CV(CustomModel)
+#     CV           AIC          AICc           BIC         AdjR2 
+# 2.488314e-02 -5.627182e+03 -5.626048e+03 -5.479169e+03  8.697892e-01 
+
+
+####################################### Applying the models to get kaggle scores
+
+Predict_Stepwise = predict(StepwiseModel, FinalTestData)
+Predict_Stepwise = exp(Predict_Stepwise)
+Predict_Stepwise = as.data.frame(Predict_Stepwise)
+
+StepwisePredicted = cbind(FinalTestData$Id,Predict_Stepwise)
+names(StepwisePredicted)[1] = "Id"
+names(StepwisePredicted)[2] = "SalePrice"
+
+summary(StepwisePredicted)
+# There are 8 NA's, no idea how or why they are there. We will replace them with 
+# the average, since that will have a negligible impact on the data.
+StepwisePredicted$SalePrice[which(is.na(StepwisePredicted$SalePrice))] = 178591  
+
+summary(StepwisePredicted)
+
+write.csv(StepwisePredicted, "SubmissionData/StepwisePredicted.csv", row.names =FALSE)
+
+
+
+Predict_Forward = predict(ForwardModel, FinalTestData)
+Predict_Forward = exp(Predict_Forward)
+Predict_Forward = as.data.frame(Predict_Forward)
+
+ForwardPredicted = cbind(FinalTestData$Id,Predict_Forward)
+names(ForwardPredicted)[1] = "Id"
+names(ForwardPredicted)[2] = "SalePrice"
+
+summary(ForwardPredicted)
+# There are 8 NA's, again, which means it is somewhere in our data. 
+ForwardPredicted$SalePrice[which(is.na(ForwardPredicted$SalePrice))] = 178591  
+
+summary(ForwardPredicted)
+
+write.csv(ForwardPredicted, "SubmissionData/ForwardPredicted.csv", row.names =FALSE)
 
 
 
 
+Predict_Backwards = predict(BackwardsModel, FinalTestData)
+Predict_Backwards = exp(Predict_Backwards)
+Predict_Backwards = as.data.frame(Predict_Backwards)
+
+BackwardPredicted = cbind(FinalTestData$Id,Predict_Backwards)
+names(BackwardPredicted)[1] = "Id"
+names(BackwardPredicted)[2] = "SalePrice"
+
+summary(BackwardPredicted)
+# There are 8 NA's, again, which means it is somewhere in our data. This time, the
+# mean is different.
+BackwardPredicted$SalePrice[which(is.na(BackwardPredicted$SalePrice))] = 178936   
+
+summary(BackwardPredicted)
+
+write.csv(BackwardPredicted, "SubmissionData/BackwardPredicted.csv", row.names =FALSE)
 
 
 
 
+Predict_Custom = predict(CustomModel, FinalTestData)
+Predict_Custom = exp(Predict_Custom)
+Predict_Custom = as.data.frame(Predict_Custom)
 
+CustomPredicted = cbind(FinalTestData$Id,Predict_Custom)
+names(CustomPredicted)[1] = "Id"
+names(CustomPredicted)[2] = "SalePrice"
 
+summary(CustomPredicted)
+# There are 8 NA's, again, which means it is somewhere in our data. This time, the
+# mean is different.
+CustomPredicted$SalePrice[which(is.na(CustomPredicted$SalePrice))] = 178182    
 
+summary(CustomPredicted)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+write.csv(CustomPredicted, "SubmissionData/CustomPredicted.csv", row.names =FALSE)
 
 
 
