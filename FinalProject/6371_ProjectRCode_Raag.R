@@ -357,6 +357,9 @@ sapply(Submission_TestData_Filtered, class)
 
 TestSubmission_1 = predict(fullStep, newdata = Submission_TestData_Filtered)
 
+## test
+AQ2_CleanData$ExterQual
+AQ2_CleanData$ExterQual = as.numeric(factor(AQ2_CleanData$ExterQual))
 
 
 
