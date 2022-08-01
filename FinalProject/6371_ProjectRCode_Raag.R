@@ -505,6 +505,8 @@ FinalTrainData = AllData[1:1460,1:81]
 CustomModel = lm(SalePrice ~  ., data = FinalTrainData)
 summary(CustomModel)
 CV(CustomModel)
+# CV           AIC          AICc           BIC         AdjR2 
+# Inf -5779.2668772 -5769.8619426 -5356.4263534     0.8870119 
 
 # Residual standard error: 0.1343 on 1380 degrees of freedom
 # (1 observation deleted due to missingness)
@@ -522,8 +524,7 @@ summary(StepwiseModel)
 # F-statistic: 454.2 on 24 and 1435 DF,  p-value: < 2.2e-16
 CV(StepwiseModel)
 #       CV           AIC          AICc           BIC         AdjR2 
-# 2.433418e-02 -5.769467e+03 -5.768487e+03 -5.632026e+03  8.817212e-01 
-
+# 2.433418e-02 -5.769467e+03 -5.768487e+03 -5.632026e+03  .8817212
 
 
 
@@ -537,9 +538,6 @@ summary(BackwardsModel)
 CV(BackwardsModel)
 #       CV        AIC       AICc        BIC      AdjR2 
 # 59.920338 820.606174 820.728623 830.501126   0.394783 
-
-
-
 
 
 
