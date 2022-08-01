@@ -362,7 +362,7 @@ AQ2_CleanData$ExterQual
 AQ2_CleanData$ExterQual = as.numeric(factor(AQ2_CleanData$ExterQual))
 
 
-
+# https://www.kaggle.com/code/ankitnagam/real-estate-in-ames-iowa/report
 
 
 
