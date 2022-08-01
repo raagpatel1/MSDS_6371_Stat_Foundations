@@ -79,11 +79,6 @@ dim(Clean_FullData)
 # complete information on a house. This sample is more than plenty to configure
 # a model. 
 
-# Remove ID Column, as we do not need it, since we can access row number. 
-# If we do need it, we can use FullData to fill in the blanks. 
-
-Clean_FullData$Id = NULL
-
 # Need to assign certain columns to be categorical/continuous. So we will output
 # the dataframe to a csv, and go through the columns, using the kaggle website
 # to help us.
@@ -92,9 +87,11 @@ write.csv(Clean_FullData,"Data/Clean_FullData.csv", row.names = T)
 
 # Have to do it manually:
 
+Clean_FullData$Id = as.numeric(Clean_FullData$Id)
+
 sapply(Clean_FullData, class)
 
-Clean_FullData[,c(1,2,5:24,26:32,34,38:41,52,54,56:58,61:63,72:74)] <- lapply(Clean_FullData[,c(1,2,5:24,26:32,34,38:41,52,54,56:58,61:63,72:74)], factor)
+Clean_FullData[,c(2,3,6:25,27:33,35,39:42,53,55,57:59,62:64,73:75)] <- lapply(Clean_FullData[,c(2,3,6:25,27:33,35,39:42,53,55,57:59,62:64,73:75)], factor)
 
 sapply(Clean_FullData, class)
 
@@ -198,8 +195,10 @@ ggplot(Clean_FullData, aes(x=YrSold, y=SalePrice, fill = YrSold)) + geom_boxplot
 # First we will create a dataframe with just the catgeorical variables and 
 # SalePrice
 
-CatModelData =  Clean_FullData %>% dplyr::select(!where(is.numeric), SalePrice, -Utilities)
-# We need sale price obviously, and all homes have the same value for utilities.
+CatModelData =  Clean_FullData %>% dplyr::select(!where(is.numeric), SalePrice, -Utilities, Id)
+
+# We need sale price obviously, and all homes have the same value for utilities. 
+# Id is for a later full join
 sapply(CatModelData, class)
 
 Model_Cat_SP = aov(SalePrice ~ YrSold, data = CatModelData)
@@ -216,10 +215,10 @@ summary(aov(SalePrice ~ YrSold, data = CatModelData))[[1]][["Pr(>F)"]][1]
 yCol = NULL
 x = 0
 
-for (i in 1:length(CatModelData)-1){
+for (i in 1:length(CatModelData[,1:44])){
   x = x + 1
   # print(x)
-  if (summary(aov(SalePrice ~ CatModelData[,x], data = CatModelData))[[1]][["Pr(>F)"]][1] > .05){ # alpha level
+  if (summary(aov(SalePrice ~ CatModelData[,x], data = CatModelData))[[1]][["Pr(>F)"]][1] > .01){ # alpha level
     yCol = append(yCol,x)
     # print(summary(aov(SalePrice ~ CatModelData[,x], data = CatModelData))[[1]][["Pr(>F)"]][1])
   }
@@ -228,62 +227,127 @@ for (i in 1:length(CatModelData)-1){
 yCol
 length(yCol)
 
-
 CatModelData = subset(CatModelData, select = -yCol)
 
 sapply(CatModelData, class)
 
+# I've noticed that some columns have similar data, so I will manually pit them against 
+# each other, to see which column to keep. 
 
-summary.aov(SalePrice ~ LotShape, data = CatModelData)
+summary(aov(SalePrice ~ GarageYrBlt  , data = CatModelData))
 
+summary(aov(SalePrice ~ GarageCond, data = CatModelData))
 
-
-
-
-
-
-
+TukeyHSD(aov(SalePrice ~ BsmtQual    , data = CatModelData))
 
 
 
+# lets just build a model
+
+# combine the 2 cat/cont data
+
+ContData = Clean_FullData %>% dplyr::select(Id,TotalBsmtSF, X1stFlrSF, GrLivArea, FullBath, TotRmsAbvGrd, GarageCars, GarageArea)
+
+AQ2_CleanData = ContData %>% full_join(CatModelData, by = "Id")
+
+AQ2_CleanData = AQ2_CleanData %>% dplyr::select(-Id,-YearRemodAdd,-Electrical,-GarageYrBlt,-GarageQual)
+
+AQ2_CleanData$SalePrice = log(AQ2_CleanData$SalePrice)
+
+sapply(AQ2_CleanData, class)
+
+dim(AQ2_CleanData)
+
+AQ2_Model = lm(SalePrice ~ ., data = AQ2_CleanData)
+
+summary(AQ2_Model)
+
+dim(summary(AQ2_Model)$coefficients)
+
+# # Now let's get rid of everything :)
+# 
+# 
+# xRow = NULL
+# x = 0
+# 
+# for (i in 1:length(summary(AQ2_Model)$coefficients[,4])){
+#   x = x + 1
+#   if (summary(AQ2_Model)$coefficients[x,4] > .01){ # alpha level
+#     xRow = append(xRow,x)
+#   }
+# }
+# 
+# xRow
+# length(xRow)
+
+# test = AQ2_Model
+# summary(test)
+# test = update(test,~.-YearBuilt2008)
+# summary(test)
+# dim(summary(test)$coefficients)
+
+# variables <- labels(test)[attr(terms(test), "order") == 1]
+# factors <- sapply(names(test$xlevels), function(x) paste0(x, test$xlevels[[x]])[-1])
+# setdiff(colnames(model.matrix(test)), c("(Intercept)", variables, unlist(factors)))
+
+
+# AQ2_Model = update(AQ2_Model,~.-Id)
+# summary(AQ2_Model)
+
+xtestx = ols_step_both_p(AQ2_Model,pent = .02,prem = .03, progress = T, details = F)
+
+# 
+# Model Summary                             
+# ---------------------------------------------------------------------
+#   R                     0.952       RMSE                   26548.362 
+# R-Squared               0.907       Coef. Var                 14.194 
+# Adj. R-Squared          0.898       MSE                704815501.583 
+# Pred R-Squared           -Inf       MAE                    15822.379 
+# ---------------------------------------------------------------------
+#
+
+# apply the model
+
+
+row.number = sample(1:nrow(AQ2_CleanData), 0.8*nrow(AQ2_CleanData))
+train = AQ2_CleanData[row.number,]
+test = AQ2_CleanData[-row.number,]
+dim(train)
+dim(test)
+
+pred1 <- predict(xtestx$model, newdata = test)
+rmse <- sqrt(sum((exp(pred1) - test$SalePrice)^2)/length(test$SalePrice))
+c(RMSE = rmse, R2=summary(xtestx$model)$r.squared)
+
+IdSalePrice = Clean_FullData %>% dplyr::select(Id,SalePrice)
+
+# new attempt
+
+SalePrice_train = AQ2_CleanData[2:1094,43]
+
+Affectors_train = as.matrix(AQ2_CleanData[2:1094,1:42]) 
+
+# SalePrice_test = as.matrix(Submission_TestData[1461:2919,2:78])
+# 
+# SalePrice_test = as.matrix(Submission_TestData[1461:2919,79])
+
+full = lm(SalePrice ~ ., data = AQ2_CleanData)
+null = lm(SalePrice ~ 1, data = AQ2_CleanData)
+
+fullStep = step(null, scope = list(upper=full), direction="both")
+
+summary(fullStep)
+# 
+# Residual standard error: 0.1101 on 947 degrees of freedom
+# Multiple R-squared:  0.9326,	Adjusted R-squared:  0.9222 
+# F-statistic: 89.72 on 146 and 947 DF,  p-value: < 2.2e-16
+# 
+
+a = predict(fullStep, newdata = test)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+TestSubmission_1 = predict(fullStep, newdata = Submission_TestData)
 
 
 
