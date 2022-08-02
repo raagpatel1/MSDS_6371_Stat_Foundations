@@ -96,6 +96,447 @@ Clean_FullData[,c(2,3,6:25,27:33,35,39:42,53,55,57:59,62:64,73:75)] <- lapply(Cl
 
 sapply(Clean_FullData, class)
 
+knitr::opts_chunk$set(echo = TRUE)
+
+source("./Functions.R")
+
+
+#loading train data
+
+hpdf<- read.csv("train.csv",header = TRUE, ",")
+head(hpdf)
+str(hpdf)
+colSums(is.na(hpdf))  ## no NA value on required columns
+
+
+
+#adding column name GrLivArea/100 in hpdf
+
+hpdf["GrLivAreaper100"] <- hpdf$GrLivArea / 100
+head(hpdf)
+
+
+
+
+
+
+
+## merging didnt work. so proceeded with train data set only. 
+
+#loading testing data
+## added missing salepricecolumn in R
+
+#test <- read.csv("test.csv",header = TRUE, ",")
+
+#head(test)
+#str(test)
+#colSums(is.na(test))
+
+
+# merging both traning and test data set to get more number of observations
+
+#hpdf <- merge(train,test,by="Id",all.x=TRUE, all.y = TRUE)
+#head(hpdf)
+#str(hpdf)
+
+
+
+
+# changing Neighborhood column to factor 
+
+
+hpdf$Neighborhood<-as.factor(hpdf$Neighborhood)
+
+str(hpdf$Neighborhood)
+
+
+
+## filtering only the neighborhood of interest and assigning it to new data frame.
+
+library(dplyr)
+
+Cent21 = hpdf %>% filter(Neighborhood == "NAmes"|Neighborhood=="Edwards"|Neighborhood=="BrkSide" ) 
+Cent21
+head(Cent21)
+count(Cent21) ## 383
+colSums(is.na(Cent21))
+
+
+
+##QOI sale price related to the square footage of the house in GrLIvArea?
+##how the SalePrice of the house is related to the square footage of the living area of the house (GrLIvArea) and if the SalesPrice (and its relationship to square footage) depends on which neighborhood the house is located in. 
+
+##separate fit lines with interaction
+
+sfit <- lm(SalePrice~GrLivAreaper100+Neighborhood+Neighborhood*GrLivAreaper100,data = Cent21)
+summary(sfit)
+confint(sfit)
+
+
+
+##plotting separate fit lines for untransformed model
+
+library(tidyverse)
+ggplot(Cent21,aes(x= (GrLivAreaper100),y=SalePrice,colour = Neighborhood))+geom_point()+geom_smooth(method="lm")
+
+
+
+
+
+
+##performing log-log model
+
+slfit <- lm(log(SalePrice)~log(GrLivAreaper100)+Neighborhood+Neighborhood*log(GrLivAreaper100),data =Cent21)
+summary(slfit)
+
+
+
+
+## plotting separate fit lines for log -log model
+
+
+
+ggplot(Cent21,aes(x=log( GrLivAreaper100),y=log(SalePrice),colour = Neighborhood))+geom_point()+geom_smooth(method="lm")
+
+
+
+
+
+### performing linear-log model
+
+
+slfit1 <- lm((SalePrice)~log(GrLivAreaper100)+Neighborhood+Neighborhood*log(GrLivAreaper100),data =Cent21)
+summary(slfit1)
+
+
+
+
+
+## plotting separate fit lines for linear -log model
+
+
+ggplot(Cent21,aes(x=log( GrLivAreaper100),y=SalePrice,colour = Neighborhood))+geom_point()+geom_smooth(method="lm")
+
+
+
+
+
+### performing log-linear model
+
+slfit2 <- lm((log(SalePrice)~GrLivAreaper100+Neighborhood+Neighborhood*GrLivAreaper100),data = Cent21)
+summary(slfit2)
+
+
+
+
+
+## plotting separate fit lines for log-linear model
+
+
+ggplot(Cent21,aes(x= GrLivAreaper100,y=log(SalePrice),colour = Neighborhood))+geom_point()+geom_smooth(method="lm")
+
+
+
+
+
+
+
+## checking the assumptions of separate lines model
+
+##Linearity for untransformed model
+
+
+library(olsrr)
+ols_plot_resid_fit(sfit)
+
+
+
+#transformed model residual plot.
+
+ols_plot_resid_fit(slfit) ## similar output
+ols_plot_resid_fit(slfit1)## similar output
+ols_plot_resid_fit(slfit2)## similar output
+
+
+##Both transformed and regular model looks random cloud providing enough evidence that the linearity assumptions are met.It is obvious that trasnformation didnt help. So proceeded with untransformed data.Next we need to find potential outliers in the data set. Also we will proceed with caution that independence assumptions are met.
+
+library(car)
+outlierTest(sfit)
+
+
+
+## these observations  are potential outliers . more than 3 times the mean. 
+
+
+Cent21[c("190"),] ## 1698 sq ft for 320 K -Neighborhood Edwards
+Cent21[c("339"),] ## 5642 sq ft for 160 K -Neighborhood Edwards
+Cent21[c("169"),] ##2704 sq ft for 345 K -Neighborhood NAmes
+Cent21[c("372"),] ##  2201  sq ft for 274 K -Neighborhood Edwards
+Cent21[c("131"),] ## 4676  sq ft for 184 K -Neighborhood Edwards
+Cent21[c("48"),] #2158 243K
+Cent21[c("180"),] #2360 for 129k
+Cent21[c("205"),] #1576 223500
+
+
+
+
+Cent21N <- Cent21[-c(339,131,190,169,372),] ## these are influential outliers
+str(Cent21N$Id)
+
+
+
+## creating a model by removing outliers  #Multiple R-squared:  0.4474,	Adjusted R-squared:   0.44
+
+sfitN <- lm(SalePrice~GrLivAreaper100+Neighborhood+Neighborhood*GrLivAreaper100,data =Cent21N)
+summary(sfitN)
+
+
+## removing two outliers gives us better R2 of 0.532 vs 0.4474. 
+#the 1698 sq ft house might be fully upgraded so the selling price (320K) could be higher, whereas the 5642 ,4676  sq ft house might be on foreclosure, so the selling price is only 160 K and 184 k repectively . But it gave us inference that neighborhood Edward is statistically insignificant to predict the sales price. SO procceded with model that has outlier 
+
+
+
+library(MASS)
+studen_resi <- studres(sfit)
+studen_resi
+plot(studen_resi)
+abline(0,0)
+
+
+
+#Histogram of residuals for regular model
+
+
+ols_plot_resid_hist(sfit)
+
+
+## Normality :  From the histogram of the residuals there is no sufficient evidence that the residuals do not follow a normal distribution. 
+
+
+## QQ plot of residual
+
+
+resi <- resid(sfit)
+resi
+plot(fitted(sfitN),resi)
+abline(0,0)
+
+qqnorm(resi)
+qqline(resi)
+
+
+
+## from QQ plot most of the data are linearily related . There are still some observations that are conerning that suggest evidence against normality. It looks like most the residuals are clustered along the line. So proceeded with assumptions the data set is normal 
+
+
+## Equal variance
+
+
+par(mfrow = c(2, 2))
+plot(sfit)
+
+##From the residual  plot , that the data points scattered randomly above and below the line 0 , however clusttering effect is seen but this could be due to majority of houses in same price range in all these neighborhood. So proceeded with the assumption of equal variance and this is backed by QQ plot - that data points are normally distributed in relation with x-axis but there are still some outliers that extremly low and extremly high  sales price. But the more than 95 % of the data falls in the dash line so proceeded with assumption of equal variance. 
+
+# removing the outliers gives us inference that the neighborhood Edward is statistically insignificant, So procceded with model that includes ouliiers
+
+##Model
+## Setting Brkside as reference 
+#PredictedSalesPrice = ß0 + ß1 * (GrLivAreaper100) + ß2 * (Edwards) + ß3 * (NAmes) + ß4 * (Edwards * GrLivAreaper100) + ß5 * (NAmes * GrLivAreaper100)
+
+## Fitted Model
+
+#PredictedSalesPrice = 19971.5 + 8716.3 * (GrLivAreaper100) + 68381.6 * (Edwards) + 54704.9 * (NAmes) - 5741.2 * (Edwards * GrLivAreaper100) -3284.7 * (NAmes * GrLivAreaper100)
+
+
+## Three regression equation: 
+# Predicted(SalesPrice|Brkside) = 19971.5 + 8716.3 * (GrLivAreaper100)
+# Predicted(SalesPrice|Edwards) = 88353.1 + 2975.1 * (GrLivAreaper100)
+# Predicted(SalesPrice|NAmes) = 74676.4 + 5431.6 * (GrLivAreaper100)
+
+
+
+## Interpretations 
+
+# The estimated average sale price for houses in the Brkside neighborhood is $19971.5 with no living area considered. 
+## For every 100 unit in living area in Brkside neighborhood, the estimated sales price increases by $8716.3
+
+
+## The estimated average sale price for houses in the Edwards neighborhood is $88353.1 with no living area considered.
+## For every 100 unit in living area in Edwards neighborhood, the estimated sales price increases by $2975.1
+
+
+# The estimated average sale price for houses in the NAmes neighborhood is $74676.4 with no living area considered.
+## For every 100 unit in living area in NAmes neighborhood, the estimated sales price increases by $5431.6.
+
+
+#> Confint(sfit)
+#                                     Estimate     2.5 %    97.5 %
+#(Intercept)                         19971.514 -4314.212 44257.239
+#GrLivAreaper100                      8716.253  6792.850 10639.657
+#NeighborhoodEdwards                 68381.591 40913.670 95849.512
+#NeighborhoodNAmes                   54704.888 27408.383 82001.393
+#GrLivAreaper100:NeighborhoodEdwards -5741.223 -7848.612 -3633.834
+#GrLivAreaper100:NeighborhoodNAmes   -3284.667 -5411.269 -1158.065
+
+
+# Confidence interval
+#95 % CI for Brkside is  from ($-4314.212,$44257.239)
+#95 % CI for Brkside and Edwards is  from ($40913.670,$95849.512)
+#95 % CI for Brkside and NAmes is  from ($27408.383,$82001.393)
+
+
+
+
+
+#dataf <- filter(Cent21,GrLivAreaper100 >=40) ?? Do you think we need to remove these as outlier to have statistically significant output for intercept. ## 524 $ 1299
+#dataf
+
+#dataf1 <- filter(Cent21,SalePrice >=300000)  ## 643 $ 725
+#dataf1
+
+MeanSalePrice <-Cent21 %>% group_by(Neighborhood) %>% summarise(SalePrice_mean = mean(SalePrice))
+MeanSalePrice
+#after outliers removed
+MeanSalePrice <-Cent21WO %>% group_by(Neighborhood) %>% summarise(SalePrice_mean = mean(SalePrice))
+MeanSalePrice
+
+# after outliers removed
+MeanLivingArea <-Cent21 %>% group_by(Neighborhood) %>% summarise(Livigarea_mean = mean(GrLivArea))
+MeanLivingArea
+
+MeanSalePrice <-Cent21WO %>% group_by(Neighborhood) %>% summarise(SalePrice_mean = mean(SalePrice))
+MeanSalePrice
+
+
+
+
+
+
+#Conclusion :
+# THe intercept of the model provides the estimated average sales price for Brkside neighboorhood is 19971.5 when living area is not considered. And we are 95% confident that price is between ($-4314.21 to $44257.239) for BrkSide neighboorhood. For every 100 unit in living area in Brkside neighborhood, the estimated sales price increases by $8716.3
+
+#For house without living area considered the average estimated sales price in Edwards neighborhood is increased by $68381.591 with 95 % confidence interval of ($40913.670,$95849.512) with respect to Brkside.
+# For every 100 unit in living area in Edwards neighborhood, the estimated sales price decreases by $5741.2 than BrKSide.
+
+#For house without living area considered the average estimated sales price in NAmes neighborhood is increased by $54704.888 with 95 % confidence interval of ($27408.383,$82001.393) with respect to Brkside. For every 100 unit in living area in NAmes neighborhood, the estimated sales price decreases by $3284.7 than Brkside. 
+
+##observational study 
+
+
+
+## outliers that are 3 times the mean
+
+
+cooksD <- cooks.distance(sfit)
+cooksD
+
+influential <- cooksD[(cooksD >(3 * mean(cooksD,na.rm = TRUE)))]
+influential
+
+
+
+## removing the influential data points
+
+names_of_influential <- names(influential)
+outliers <- Cent21[names_of_influential,]
+Cent21WO <- Cent21 %>% anti_join(outliers)
+
+
+## fitting a model with outliers addressed and CI## Multiple R-squared:  0.529,	Adjusted R-squared:  0.5226 
+
+sfitWO <-lm(SalePrice~GrLivAreaper100+Neighborhood+Neighborhood*GrLivAreaper100,data =Cent21WO)
+summary(sfitWO)
+confint(sfitWO)
+
+
+
+##  Better R2 with outliers removed
+
+
+
+
+# plots after outliers removed.
+
+par(mfrow = c(2, 2))
+plot(sfitWO)
+ols_plot_resid_hist(sfitWO)
+
+
+## NOrmality : JUdging from the hsitogram of the residuals, with the ouliers removed , there is no evidence that residual do not follow normal distribution.
+## Linearity : The residual plot looks randomly distributed and there is sufficient evidence for linearity.
+## Equal variance : QQ plot - that data points are normally distributed in relation with x-axis, sufficient evidence of equal variance.
+##independence: We will assume the data is independent to eachother, by ignoring the clustering effect. 
+## Outliers: The outliers were addressed by follwing the cooks distance method. any values greater than 3 times the mean were excluded in order to get proper estimation of living area related to sales price.
+
+
+##Model 2 without outliers
+
+#Coefficients:
+#                                    Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)                          22396.3    10171.0   2.202 0.028286 *  
+#GrLivAreaper100                       8416.6      809.5  10.397  < 2e-16 ***
+#NeighborhoodEdwards                  35252.2    13995.4   2.519 0.012197 *  
+#NeighborhoodNAmes                    55475.3    11500.0   4.824 2.06e-06 ***
+#GrLivAreaper100:NeighborhoodEdwards  -3235.5     1108.4  -2.919 0.003727 ** 
+#GrLivAreaper100:NeighborhoodNAmes    -3247.7      900.7  -3.606 0.000354 ***
+---
+  #Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+  
+  #Residual standard error: 23430 on 368 degrees of freedom
+  #Multiple R-squared:  0.529,	Adjusted R-squared:  0.5226 
+  #F-statistic: 82.68 on 5 and 368 DF,  p-value: < 2.2e-16
+  
+  
+  
+  ## Setting Brkside as reference 
+  
+  #PredictedSalesPrice = ß0 + ß1 * (GrLivAreaper100) + ß2 * (Edwards) + ß3 * (NAmes) + ß4 * (Edwards * GrLivAreaper100) + ß5 * (NAmes * GrLivAreaper100)
+
+## Fitted Model
+
+#PredictedSalesPrice =  22396.3 +   8416.6* (GrLivAreaper100) +  35252.2* (Edwards) + 55475.3  * (NAmes) - -3235.5 * (Edwards * GrLivAreaper100) -3247.7 * (NAmes * GrLivAreaper100)
+
+
+## Three regression equation: 
+# Predicted(SalesPrice|Brkside) = 22396.3 +  8416.6  * (GrLivAreaper100)
+# Predicted(SalesPrice|Edwards) =  57648.5 + 5181.1 * (GrLivAreaper100)
+# Predicted(SalesPrice|NAmes) = 77871.6 + 5168.9* (GrLivAreaper100)
+
+## Interpretations 
+
+# The estimated average sale price for houses in the Brkside neighborhood is $22396.35 with no living area considered. 
+## For every 100 unit in living area in Brkside neighborhood, the estimated sales price increases by $8416.6
+
+
+## The estimated average sale price for houses in the Edwards neighborhood is $57648.5 with no living area considered.
+## For every 100 unit in living area in Edwards neighborhood, the estimated sales price increases by $5181.1
+
+
+# The estimated average sale price for houses in the NAmes neighborhood is $77871.6 with no living area considered.
+## For every 100 unit in living area in NAmes neighborhood, the estimated sales price increases by $5168.9.
+
+
+#> confint(sfitWO)
+# 2.5 %    97.5 %
+  #(Intercept)                          2395.768 42396.774
+  #GrLivAreaper100                      6824.769 10008.425
+  #NeighborhoodEdwards                  7731.154 62773.281
+  #NeighborhoodNAmes                   32861.295 78089.322
+  #GrLivAreaper100:NeighborhoodEdwards -5415.079 -1055.857
+  #GrLivAreaper100:NeighborhoodNAmes   -5018.911 -1476.437
+  
+  #Conclusion
+  
+  # THe intercept of the model provides the estimated average sales price for Brkside neighboorhood is $22396.3 when living area is not considered. And we are 95% confident that price is between ($2395.768, $42396.774) for BrkSide neighboorhood. For every 100 unit in living area in Brkside neighborhood, the estimated sales price increases by $8416.6
+  
+#For house without living area considered the average estimated sales price in Edwards neighborhood is increased by $57648.5 with 95 % confidence interval of ($ 7731.154,$62773.281) with respect to Brkside.
+# For every 100 unit in living area in Edwards neighborhood, the estimated sales price decreases by $3235.5 than BrKSide.
+
+#For house without living area considered the average estimated sales price in NAmes neighborhood is increased by $54704.888 with 95 % confidence interval of ($32861.295,$78089.322) with respect to Brkside. For every 100 unit in living area in NAmes neighborhood, the estimated sales price decreases by $3247.7 than Brkside. 
+
+##observational study 
+
+
 
 ####################################### Data Selection // Analysis Question 1
 
@@ -362,8 +803,6 @@ summary(AQ1Model)
 # AQ2_CleanData$ExterQual
 # AQ2_CleanData$ExterQual = as.numeric(factor(AQ2_CleanData$ExterQual))
 # 
-
-# https://www.kaggle.com/code/ankitnagam/real-estate-in-ames-iowa/report
 
 # 
 # I am keeping the above code, as a way to show that this next part is us
@@ -651,253 +1090,4 @@ CustomPredicted$SalePrice[which(is.na(CustomPredicted$SalePrice))] = 178182
 summary(CustomPredicted)
 
 write.csv(CustomPredicted, "SubmissionData/CustomPredicted.csv", row.names =FALSE)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
