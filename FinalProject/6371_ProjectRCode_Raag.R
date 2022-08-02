@@ -504,9 +504,10 @@ sum(is.na(AllData$SalePrice))
 
 # Let's create a model with everything in it, then use olss stepwise to 
 # fix it. 
-par(mfrow = c(2,2))
+
 
 FirstModel = lm(SalePrice ~  ., data = FinalTrainData)
+par(mfrow = c(2,2))
 plot(FirstModel)
 summary(FirstModel)
 CV(FirstModel)
