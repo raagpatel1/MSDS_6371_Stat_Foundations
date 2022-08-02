@@ -504,8 +504,10 @@ sum(is.na(AllData$SalePrice))
 
 # Let's create a model with everything in it, then use olss stepwise to 
 # fix it. 
+par(mfrow = c(2,2))
 
 FirstModel = lm(SalePrice ~  ., data = FinalTrainData)
+plot(FirstModel)
 summary(FirstModel)
 CV(FirstModel)
 # CV           AIC          AICc           BIC         AdjR2 
@@ -520,6 +522,7 @@ CV(FirstModel)
 # the AdjR^2 is not lower with these many variables in the model. 
 
 StepwiseModel = ols_step_both_p(FirstModel, prem = 0.01, pent = 0.02, details = F, progress = T)
+plot(StepwiseModel)
 StepwiseModel = StepwiseModel$model
 summary(StepwiseModel)
 # Residual standard error: 0.1374 on 1435 degrees of freedom
@@ -532,6 +535,7 @@ CV(StepwiseModel)
 
 
 BackwardsModel = ols_step_backward_p(FirstModel, prem = 0.01, details = F, progress = T)
+plot(BackwardsModel)
 BackwardsModel = BackwardsModel$model
 summary(BackwardsModel)
 # Residual standard error: 0.1363 on 1429 degrees of freedom
@@ -544,6 +548,7 @@ CV(BackwardsModel)
 
 
 ForwardModel = ols_step_forward_p(FirstModel, penter = 0.01, details = F, progress = T)
+plot(ForwardModel)
 ForwardModel = ForwardModel$model
 summary(ForwardModel)
 # Residual standard error: 0.1374 on 1435 degrees of freedom
@@ -562,6 +567,7 @@ CustomModel = lm(SalePrice ~ MSZoning+LotArea+Street+
                    BsmtFinSF2+HeatingQC+CentralAir+X1stFlrSF+X2ndFlrSF+
                    BsmtFullBath+KitchenQual+TotRmsAbvGrd+Functional+Fireplaces+
                    GarageCars+ScreenPorch+PoolQC+SaleCondition, data = FinalTrainData)
+plot(CustomModel)
 summary(CustomModel)
 CV(CustomModel)
 #     CV           AIC          AICc           BIC         AdjR2 
